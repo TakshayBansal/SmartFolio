@@ -62,7 +62,7 @@ if __name__ == '__main__':
     parser.add_argument("-pos_yn", "-pos", default="y", help="是否加入动量关系图")
     parser.add_argument("-neg_yn", "-neg", default="y", help="是否加入反转关系图")
     parser.add_argument("-multi_reward_yn", "-mr", default="y", help="是否加入多奖励学习")
-    parser.add_argument("-policy", "-p", default="MLP", help="策略网络")
+    parser.add_argument("-policy", "-p", default="HGAT", help="策略网络")
     args = parser.parse_args()
 
     # debug 用参数设置
@@ -77,7 +77,7 @@ if __name__ == '__main__':
     args.test_start_date = '2024-01-02'
     args.test_end_date = '2024-12-30'
     args.batch_size = 32
-    args.max_epochs = 20
+    args.max_epochs = 30
     args.seed = 123
     args.input_dim = 6
     args.ind_yn = True
