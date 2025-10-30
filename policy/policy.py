@@ -7,6 +7,8 @@ import torch.nn as nn
 from stable_baselines3.common.policies import ActorCriticPolicy
 
 from model.model import HGAT
+from torch_geometric.data import feature_store
+from torch_geometric.data.data import FeatureStore
 
 
 class HGATNetwork(nn.Module):
@@ -42,13 +44,47 @@ class HGATNetwork(nn.Module):
         self.value_net = HGAT(num_stocks=self.num_stocks, n_features=self.n_features,
                               num_heads=n_head, hidden_dim=hidden_dim,
                               no_ind=no_ind, no_neg=no_neg)
+    def preprocess_obs(self, obs):
+        """
+        Converts flat environment obs to HGAT expected input.
+        Assumes obs shape is (batch, num_stocks * obs_len)
+        """
+        batch = obs.shape[0]
+        num_stocks = self.num_stocks
+
+        # Calculate slices
+        offset = 0
+        # Industry adjacency matrix
+        ind_adj = obs[:, offset:offset + num_stocks * num_stocks].reshape(batch, num_stocks, num_stocks)
+        offset += num_stocks * num_stocks
+
+        # Positive adjacency matrix
+        pos_adj = obs[:, offset:offset + num_stocks * num_stocks].reshape(batch, num_stocks, num_stocks)
+        offset += num_stocks * num_stocks
+
+        # Negative adjacency matrix
+        neg_adj = obs[:, offset:offset + num_stocks * num_stocks].reshape(batch, num_stocks, num_stocks)
+        offset += num_stocks * num_stocks
+
+        # Features (rest)
+        features = obs[:, offset:].reshape(batch, num_stocks, self.n_features)
+        # If HGAT expects input shape [batch, (adj_mats + features), num_stocks]:
+        # Stack adjacency matrices and features along the 1st dimension
+        # Final shape: [batch, 3*num_stocks + n_features, num_stocks]
+        inputs = torch.cat([
+            ind_adj, pos_adj, neg_adj, features.transpose(1, 2)  # transpose so [batch, n_features, num_stocks]
+        ], dim=1)
+        return inputs
 
     def forward(self, features: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
             :return: (th.Tensor, th.Tensor) latent_policy, latent_value of     the specified network.
             If all layers are shared, then ``latent_policy == latent_value``
             """
-        return self.policy_net(features), self.value_net(features)
+        x = self.preprocess_obs(features)
+        return self.policy_net(x), self.value_net(x)
+
+        # return self.policy_net(features), self.value_net(features)
 
     def forward_actor(self, features: torch.Tensor) -> torch.Tensor:
         return self.policy_net(features)
